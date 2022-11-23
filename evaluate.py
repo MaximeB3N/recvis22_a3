@@ -9,10 +9,10 @@ from seaborn import heatmap
 import matplotlib.pyplot as plt
 import numpy as np
 
-from model import Net, ResNet, NN, ResNetFeatures
+from model import Net, ResNet, NN, NN2, ResNetFeatures
 
 parser = argparse.ArgumentParser(description='RecVis A3 evaluation script')
-parser.add_argument('--data', type=str, default='bird_dataset', metavar='D',
+parser.add_argument('--data', type=str, default='bird_dataset_small', metavar='D',
                     help="folder where data is located. test_images/ need to be found in the folder")
 parser.add_argument('--model', type=str, metavar='M',
                     help="the model file to be evaluated. Usually it is of the form model_X.pth")
@@ -28,7 +28,7 @@ def main():
     state_dict = torch.load(args.model)
     features_model = ResNetFeatures()
     features_model.eval()
-    model = NN()
+    model = NN2()
     model.load_state_dict(state_dict)
     model.eval()
     if use_cuda:
@@ -38,13 +38,13 @@ def main():
     else:
         print('Using CPU')
 
-    from data import data_transforms
+    from data import data_transform_small_eval
 
     if args.val != 0:
         batch_size = 64
         val_loader = torch.utils.data.DataLoader(
         datasets.ImageFolder(args.data + '/val_images',
-                            transform=data_transforms),
+                            transform=data_transform_small_eval),
         batch_size=batch_size, shuffle=False, num_workers=8)
 
         validation_loss = validation(val_loader, model, features_model, use_cuda)
@@ -67,7 +67,7 @@ def main():
         output_file.write("Id,Category\n")
         for f in tqdm(os.listdir(test_dir)):
             if 'jpg' in f:
-                data = data_transforms(pil_loader(test_dir + '/' + f))
+                data = data_transform_small_eval(pil_loader(test_dir + '/' + f))
                 data = data.view(1, data.size(0), data.size(1), data.size(2))
                 if use_cuda:
                     data = data.cuda()

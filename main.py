@@ -10,11 +10,11 @@ from tqdm import tqdm
 
 # Training settings
 parser = argparse.ArgumentParser(description='RecVis A3 training script')
-parser.add_argument('--data', type=str, default='bird_dataset', metavar='D',
+parser.add_argument('--data', type=str, default='bird_dataset_small', metavar='D',
                     help="folder where data is located. train_images/ and val_images/ need to be found in the folder")
-parser.add_argument('--batch-size', type=int, default=128, metavar='B',
+parser.add_argument('--batch-size', type=int, default=64, metavar='B',
                     help='input batch size for training (default: 64)')
-parser.add_argument('--epochs', type=int, default=50, metavar='N',
+parser.add_argument('--epochs', type=int, default=100, metavar='N',
                     help='number of epochs to train (default: 10)')
 parser.add_argument('--lr', type=float, default=0.001, metavar='LR',
                     help='learning rate (default: 0.01)')
@@ -38,24 +38,30 @@ if not os.path.isdir(args.experiment):
     os.makedirs(args.experiment)
 
 # Data initialization and loading
-from data import data_transforms
+from data import data_transforms, data_transform_small
 
+print("Loading data from {}".format(args.data))
 train_loader = torch.utils.data.DataLoader(
     datasets.ImageFolder(args.data + '/train_images',
-                         transform=data_transforms),
+                         transform=data_transform_small),
     batch_size=args.batch_size, shuffle=True, num_workers=8)
 val_loader = torch.utils.data.DataLoader(
     datasets.ImageFolder(args.data + '/val_images',
-                         transform=data_transforms),
+                         transform=data_transform_small),
     batch_size=args.batch_size, shuffle=False, num_workers=8)
 
 # Neural network and optimizer
 # We define neural net in model.py so that it can be reused by the evaluate.py script
-from model import Net, ResNet, ResNetFeatures, NN
+from model import Net, ResNet, ResNetFeatures, NN, NN2, ResNetRetrain
 
 # model = Net()
-features_model = ResNetFeatures()
-model = NN()
+pathFeatures = "experiment/resnet_features_best_model_221_bis.pth"
+# features_model = nn.Identity()
+features_model = ResNetFeatures(pathFeatures=pathFeatures)
+features_model.eval()
+# model = ResNetRetrain()
+model = NN2()
+
 
 # model.load_state_dict(torch.load('experiment/resnet_all_epoch_20.pth'))
 
@@ -104,6 +110,7 @@ def validation():
             # sum up batch loss
             criterion = torch.nn.CrossEntropyLoss(reduction='mean')
             validation_loss += criterion(output, target).data.item()
+
             # get the index of the max log-probability
             pred = output.data.max(1, keepdim=True)[1]
             correct += pred.eq(target.data.view_as(pred)).cpu().sum()
@@ -113,14 +120,23 @@ def validation():
             validation_loss, correct, len(val_loader.dataset),
             100. * correct / len(val_loader.dataset)))
     
-    return validation_loss
+    return validation_loss, correct/len(val_loader.dataset)
 
+max_validation_accuracy = 0
 for epoch in range(1, args.epochs + 1):
     train(epoch)
-    validation_loss = validation()
-    if epoch %  args.save_interval == 0:
-        model_file = args.experiment + '/model_' + str(epoch) + '.pth'
-        torch.save(model.state_dict(), model_file)
-        print('Saved model to ' + model_file + '. You can run `python evaluate.py --model ' + model_file + '` to generate the Kaggle formatted csv file\n')
+    validation_loss, accuracy = validation()
+
+    if accuracy > max_validation_accuracy:
+        max_validation_accuracy = accuracy
+        print('Saving model best scores at epoch {}'.format(epoch))
+        torch.save(model.state_dict(), os.path.join(args.experiment, 'resnet_with_features_best_model_221_bis.pth'))
+
+    # if epoch %  args.save_interval == 0:
+    #     model_file = args.experiment + '/model_' + str(epoch) + '.pth'
+    #     torch.save(model.state_dict(), model_file)
+    #     print('Saved model to ' + model_file + '. You can run `python evaluate.py --model ' + model_file + '` to generate the Kaggle formatted csv file\n')
 
     scheduler.step(validation_loss)
+
+print("The best validation accuracy is {}".format(max_validation_accuracy))
