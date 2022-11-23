@@ -15,3 +15,19 @@ data_transforms = transforms.Compose([
 ])
 
 
+data_transform_no_norm = transforms.Compose([
+    # transforms.Resize((256, 256)),
+    transforms.ToTensor()
+])
+
+data_to_tensor = transforms.Compose([
+    transforms.ToTensor()
+])
+
+data_transform_small = transforms.Compose([
+    transforms.Resize((200, 200)),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.4493, 0.4575, 0.3962],
+                                    std=[0.2601, 0.2581, 0.2701])
+])
+
