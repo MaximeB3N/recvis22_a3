@@ -10,7 +10,7 @@ from tqdm import tqdm
 
 # Training settings
 parser = argparse.ArgumentParser(description='RecVis A3 training script')
-parser.add_argument('--data', type=str, default='bird_dataset_small', metavar='D',
+parser.add_argument('--data', type=str, default='bird_dataset_small_masked', metavar='D',
                     help="folder where data is located. train_images/ and val_images/ need to be found in the folder")
 parser.add_argument('--batch-size', type=int, default=64, metavar='B',
                     help='input batch size for training (default: 64)')
@@ -44,20 +44,20 @@ print("Loading data from {}".format(args.data))
 train_loader = torch.utils.data.DataLoader(
     datasets.ImageFolder(args.data + '/train_images',
                          transform=data_transform_small),
-    batch_size=args.batch_size, shuffle=True, num_workers=8)
+    batch_size=args.batch_size, shuffle=True, num_workers=0)
 val_loader = torch.utils.data.DataLoader(
     datasets.ImageFolder(args.data + '/val_images',
                          transform=data_transform_small),
-    batch_size=args.batch_size, shuffle=False, num_workers=8)
+    batch_size=args.batch_size, shuffle=False, num_workers=0)
 
 # Neural network and optimizer
 # We define neural net in model.py so that it can be reused by the evaluate.py script
 from model import Net, ResNet, ResNetFeatures, NN, NN2, ResNetRetrain
 
 # model = Net()
-pathFeatures = "experiment/resnet_features_best_model_221_bis.pth"
+# pathFeatures = "experiment/resnet_features_best_model_221_bis.pth"
 # features_model = nn.Identity()
-features_model = ResNetFeatures(pathFeatures=pathFeatures)
+features_model = ResNetFeatures() # pathFeatures=pathFeatures)
 features_model.eval()
 # model = ResNetRetrain()
 model = NN2()
@@ -130,7 +130,7 @@ for epoch in range(1, args.epochs + 1):
     if accuracy > max_validation_accuracy:
         max_validation_accuracy = accuracy
         print('Saving model best scores at epoch {}'.format(epoch))
-        torch.save(model.state_dict(), os.path.join(args.experiment, 'resnet_with_features_best_model_221_bis.pth'))
+        torch.save(model.state_dict(), os.path.join(args.experiment, 'resnet_masked_best_model_221_bis.pth'))
 
     # if epoch %  args.save_interval == 0:
     #     model_file = args.experiment + '/model_' + str(epoch) + '.pth'

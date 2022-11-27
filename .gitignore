@@ -1,6 +1,7 @@
 /bird_dataset
 /bird_dataset_bis
 /bird_dataset_small
+/bird_dataset_small_masked
 /ObjectDetection
 .DS_Store
 /venv
