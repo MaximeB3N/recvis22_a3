@@ -1,3 +1,10 @@
 torch
 torchvision
 tqdm
+mmseg
+mmcv-full
+sklearn
+seaborn
+matplotlib
+opencv-python
+transformers

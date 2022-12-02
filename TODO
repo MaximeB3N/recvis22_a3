@@ -1,3 +1,0 @@
-Look at the example that aren't well predicted and try to understand why they aren't well predicted.
-- Model : resnet_features_best_model_221_bis and resnet_features_best_model_186_bis
-- Without retraining of the ResNet

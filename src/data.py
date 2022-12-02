@@ -51,37 +51,16 @@ data_to_tensor = transforms.Compose([
 
 
 data_transform_small = transforms.Compose([
-    # transforms.Resize((200, 200)), 
-    # transforms.Resize((186, 186)),
     transforms.Resize((221, 221)),
     # data augmentation
     DataAugmentator(),
-    # transforms.RandomHorizontalFlip(),
-    # transforms.RandomVerticalFlip(),
-    # transforms.RandomRotation(5),
-    # transforms.AutoAugment(),
-    # transforms.RandomAdjustSharpness(2),
-    # transforms.RandomAutocontrast(),
-    # transforms.RandomEqualize(),
     transforms.ToTensor(),
     transforms.Normalize(mean=[0.4493, 0.4575, 0.3962],
                                     std=[0.2601, 0.2581, 0.2701])
 ])
 
 data_transform_small_eval = transforms.Compose([
-    # transforms.Resize((200, 200)), 
-    # transforms.Resize((186, 186)),
     transforms.Resize((221, 221)),
-    # transforms.Resize((256, 256)),
-    # data augmentation
-    # DataAugmentator(),
-    # transforms.RandomHorizontalFlip(),
-    # transforms.RandomVerticalFlip(),
-    # transforms.RandomRotation(5),
-    # transforms.AutoAugment(),
-    # transforms.RandomAdjustSharpness(2),
-    # transforms.RandomAutocontrast(),
-    # transforms.RandomEqualize(),
     transforms.ToTensor(),
     transforms.Normalize(mean=[0.4493, 0.4575, 0.3962],
                                     std=[0.2601, 0.2581, 0.2701])

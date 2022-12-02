@@ -9,13 +9,10 @@ from seaborn import heatmap
 import matplotlib.pyplot as plt
 import numpy as np
 
-from model import Net, ResNet, NN, NN2, ResNetFeatures
-from dataset import Dataset, get_list_files
+from src.models import NN, ResNetFeatures
 
 parser = argparse.ArgumentParser(description='RecVis A3 evaluation script')
-parser.add_argument('--data', type=str, default='bird_dataset_small/', metavar='D',
-                    help="folder where data is located. test_images/ need to be found in the folder")
-parser.add_argument('--masked_data', type=str, default='bird_dataset_small_masked/', metavar='D',
+parser.add_argument('--data', type=str, default='bird_dataset_small', metavar='D',
                     help="folder where data is located. test_images/ need to be found in the folder")
 parser.add_argument('--model', type=str, metavar='M',
                     help="the model file to be evaluated. Usually it is of the form model_X.pth")
@@ -30,9 +27,10 @@ use_cuda = torch.cuda.is_available()
 def main():
     state_dict = torch.load(args.model)
     features_model = ResNetFeatures()
-    model = NN2(in_layer=4096)
+    features_model.eval()
+    model = NN(in_layer=2*2048)
     model.load_state_dict(state_dict)
-    
+    model.eval()
     if use_cuda:
         print('Using GPU')
         features_model.cuda()
@@ -40,17 +38,14 @@ def main():
     else:
         print('Using CPU')
 
-    model.eval()
-    features_model.eval()
     from data import data_transform_small_eval
-
 
     if args.val != 0:
         batch_size = 64
-        _, val_files, _ = get_list_files(args.data, args.masked_data)
-        val_dataset = Dataset(val_files, transform=data_transform_small_eval)
-        val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size, 
-                                    shuffle=False, num_workers=os.cpu_count())
+        val_loader = torch.utils.data.DataLoader(
+        datasets.ImageFolder(args.data + '/val_images',
+                            transform=data_transform_small_eval),
+        batch_size=batch_size, shuffle=False, num_workers=8)
 
         validation_loss = validation(val_loader, model, features_model, use_cuda)
 
@@ -67,36 +62,20 @@ def main():
                 with Image.open(f) as img:
                     return img.convert('RGB')
 
-        _, val_files, test_files = get_list_files(args.data, args.masked_data)
-        test_dataset = Dataset(test_files, transform=data_transform_small_eval)
-        test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=1,
-                                    shuffle=False, num_workers=os.cpu_count())
-
-        val_dataset = Dataset(val_files, transform=data_transform_small_eval)
-        val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=1,
-                                    shuffle=False, num_workers=os.cpu_count())
 
         output_file = open(args.outfile, "w")
         output_file.write("Id,Category\n")
-        for data, mask, name in tqdm(test_loader):
-            if use_cuda:
-                data, mask = data.cuda(), mask.cuda()
-            
-            # batch size is 1
-            # data = data.unsqueeze(0)
-            # mask = mask.unsqueeze(0)
-
-            data = features_model(data)
-            mask = features_model(mask)
-            # stack the two images
-            data = torch.cat((data, mask), 1)
-            output = model(data)
-            pred = output.data.max(1, keepdim=True)[1]
-            # print(output.data.max(1, keepdim=True))
-            # print(pred)
-            # break
-            # output_file.write("%s,%d\n" % (name[0], pred))
-            output_file.write("%s,%d\n" % (name[0][:-4], pred))
+        for f in tqdm(os.listdir(test_dir)):
+            if 'jpg' in f:
+                data = data_transform_small_eval(pil_loader(test_dir + '/' + f))
+                data = data.view(1, data.size(0), data.size(1), data.size(2))
+                if use_cuda:
+                    data = data.cuda()
+                
+                data = features_model(data)
+                output = model(data)
+                pred = output.data.max(1, keepdim=True)[1]
+                output_file.write("%s,%d\n" % (f[:-4], pred))
 
         output_file.close()
 
@@ -114,14 +93,11 @@ def validation(val_loader, model, features_model, use_cuda):
     # list to store the ground truth to plot the confusion matrix
     ground_truth = []
     with torch.no_grad():
-        for data, mask, target in val_loader:
+        for data, target in val_loader:
             if use_cuda:
-                data, mask, target = data.cuda(), mask.cuda(), target.cuda()
-
+                data, target = data.cuda(), target.cuda()
+            
             data = features_model(data)
-            mask = features_model(mask)
-            # stack the two images
-            data = torch.cat((data, mask), 1)
             output = model(data)
             # sum up batch loss
             criterion = torch.nn.CrossEntropyLoss(reduction='mean')

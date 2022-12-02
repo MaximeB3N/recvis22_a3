@@ -1,7 +1,6 @@
-/bird_dataset
-/bird_dataset_bis
-/bird_dataset_small
-/bird_dataset_small_masked
+data/
+*.pth
+*.weights
 /ObjectDetection
 .DS_Store
 /venv

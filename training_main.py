@@ -1,13 +1,8 @@
 import argparse
 import os
 from sched import scheduler
-import numpy as np
 import torch
-import torch.nn as nn
 import torch.optim as optim
-from torchvision import datasets
-from torch.autograd import Variable
-from tqdm import tqdm
 
 # Training settings
 parser = argparse.ArgumentParser(description='RecVis A3 training script')
@@ -41,8 +36,8 @@ if not os.path.isdir(args.experiment):
     os.makedirs(args.experiment)
 
 # Data initialization and loading
-from src.data import data_transforms, data_transform_small
-from dataset import Dataset, get_list_files
+from src.data import data_transform_small
+from src.dataset import Dataset, get_list_files
 
 train_files, val_files, _ = get_list_files(args.data, args.masked_data)
 print("Loading data from {}".format(args.data))
@@ -52,32 +47,15 @@ val_dataset = Dataset(val_files, transform=data_transform_small)
 train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=os.cpu_count())
 val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=os.cpu_count())
 
-# train_loader = torch.utils.data.DataLoader(
-#     datasets.ImageFolder(args.data + '/train_images',
-#                          transform=data_transform_small),
-#     batch_size=args.batch_size, shuffle=True, num_workers=os.cpu_count())
-# val_loader = torch.utils.data.DataLoader(
-#     datasets.ImageFolder(args.data + '/val_images',
-#                          transform=data_transform_small),
-#     batch_size=args.batch_size, shuffle=False, num_workers=os.cpu_count())
-
 # Neural network and optimizer
 # We define neural net in model.py so that it can be reused by the evaluate.py script
-from src.model import Net, ResNet, ResNetFeatures, NN, NN2, ResNetRetrain
+from src.models import ResNetFeatures, NN
 
-# model = Net()
-# pathFeatures = "experiment/resnet_features_best_model_221_bis.pth"
-# features_model = nn.Identity()
-features_model = ResNetFeatures() # pathFeatures=pathFeatures)
-# features_model.eval()
-# model = ResNetRetrain()
-model = NN2(in_layer=2*512)
+features_model = ResNetFeatures()
+features_model.eval()
 
+model = NN(in_layer=2*2048)
 
-# model.load_state_dict(torch.load('experiment/resnet_all_epoch_20.pth'))
-
-# for param in model.parameters():
-#     param.requires_grad = True
 
 if use_cuda:
     print('Using GPU')
@@ -147,15 +125,10 @@ for epoch in range(1, args.epochs + 1):
 
     if accuracy > criteria:
         criteria = accuracy
-    # if validation_loss < criteria:
-    #     criteria = validation_loss
+
         print('Saving model best scores at epoch {}'.format(epoch))
         torch.save(model.state_dict(), os.path.join(args.experiment, 'resnet_masked_best_model_221_ter.pth'))
 
-    # if epoch %  args.save_interval == 0:
-    #     model_file = args.experiment + '/model_' + str(epoch) + '.pth'
-    #     torch.save(model.state_dict(), model_file)
-    #     print('Saved model to ' + model_file + '. You can run `python evaluate.py --model ' + model_file + '` to generate the Kaggle formatted csv file\n')
 
     scheduler.step(validation_loss)
 
