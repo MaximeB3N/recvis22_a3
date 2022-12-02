@@ -30,17 +30,18 @@ class ResNetFeatures(nn.Module):
             self.features = self.load_model(pathFeatures)
 
         else:
-            resnet = torchvision.models.resnet50(pretrained=True)
+            resnet = torchvision.models.resnet34(pretrained=True)
 
             self.features = nn.Sequential(*list(resnet.children())[:-1])
 
-            for param in self.features.parameters():
-                param.requires_grad = False
+            # for param in self.features.parameters():
+            #     param.requires_grad = False
 
-            self.features.eval()
+            # self.features.eval()
         
     def forward(self, x):
         x = self.features(x)
+        # print(x.shape)
         return x
 
     def load_model(self, path):
@@ -56,11 +57,12 @@ class ResNetFeatures(nn.Module):
 
 
 class NN2(nn.Module):
-    def __init__(self, layers = [512, 256, 128]):
+    def __init__(self, layers = [1024, 256, 128], in_layer=2048):
         super(NN2, self).__init__()
 
+        self.in_layer = in_layer
         self.dropout0 = nn.Dropout(0.5)
-        self.fc1 = nn.Linear(2048, layers[0])
+        self.fc1 = nn.Linear(self.in_layer, layers[0])
         self.batchnorm1 = nn.BatchNorm1d(layers[0])
         self.dropout1 = nn.Dropout(0.5)
 
@@ -77,7 +79,7 @@ class NN2(nn.Module):
         print('The number of parameters in the model is: {}'.format(sum([p.numel() for p in self.parameters()])))
 
     def forward(self, x):
-        x = x.view(-1, 2048)
+        x = x.view(-1, self.in_layer)
         x = self.dropout0(x)
         x = F.relu(self.batchnorm1(self.fc1(x)))
         x = self.dropout1(x)
