@@ -1,6 +1,7 @@
 import argparse
 import os
 from sched import scheduler
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -10,7 +11,9 @@ from tqdm import tqdm
 
 # Training settings
 parser = argparse.ArgumentParser(description='RecVis A3 training script')
-parser.add_argument('--data', type=str, default='bird_dataset_small_masked', metavar='D',
+parser.add_argument('--data', type=str, default='bird_dataset_small/', metavar='D',
+                    help="folder where data is located. train_images/ and val_images/ need to be found in the folder")
+parser.add_argument('--masked_data', type=str, default='bird_dataset_small_masked/', metavar='D',
                     help="folder where data is located. train_images/ and val_images/ need to be found in the folder")
 parser.add_argument('--batch-size', type=int, default=64, metavar='B',
                     help='input batch size for training (default: 64)')
@@ -39,16 +42,24 @@ if not os.path.isdir(args.experiment):
 
 # Data initialization and loading
 from src.data import data_transforms, data_transform_small
+from dataset import Dataset, get_list_files
 
+train_files, val_files, _ = get_list_files(args.data, args.masked_data)
 print("Loading data from {}".format(args.data))
-train_loader = torch.utils.data.DataLoader(
-    datasets.ImageFolder(args.data + '/train_images',
-                         transform=data_transform_small),
-    batch_size=args.batch_size, shuffle=True, num_workers=0)
-val_loader = torch.utils.data.DataLoader(
-    datasets.ImageFolder(args.data + '/val_images',
-                         transform=data_transform_small),
-    batch_size=args.batch_size, shuffle=False, num_workers=0)
+
+train_dataset = Dataset(train_files, transform=data_transform_small)
+val_dataset = Dataset(val_files, transform=data_transform_small)
+train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=os.cpu_count())
+val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=os.cpu_count())
+
+# train_loader = torch.utils.data.DataLoader(
+#     datasets.ImageFolder(args.data + '/train_images',
+#                          transform=data_transform_small),
+#     batch_size=args.batch_size, shuffle=True, num_workers=os.cpu_count())
+# val_loader = torch.utils.data.DataLoader(
+#     datasets.ImageFolder(args.data + '/val_images',
+#                          transform=data_transform_small),
+#     batch_size=args.batch_size, shuffle=False, num_workers=os.cpu_count())
 
 # Neural network and optimizer
 # We define neural net in model.py so that it can be reused by the evaluate.py script
@@ -58,9 +69,9 @@ from src.model import Net, ResNet, ResNetFeatures, NN, NN2, ResNetRetrain
 # pathFeatures = "experiment/resnet_features_best_model_221_bis.pth"
 # features_model = nn.Identity()
 features_model = ResNetFeatures() # pathFeatures=pathFeatures)
-features_model.eval()
+# features_model.eval()
 # model = ResNetRetrain()
-model = NN2()
+model = NN2(in_layer=2*512)
 
 
 # model.load_state_dict(torch.load('experiment/resnet_all_epoch_20.pth'))
@@ -75,17 +86,21 @@ if use_cuda:
 
 else:
     print('Using CPU')
-
-optimizer = optim.Adam(model.parameters(), lr=args.lr) #, momentum=args.momentum)
+all_params = list(model.parameters()) + list(features_model.parameters())
+print("There is {} parameters in the model".format(sum([p.numel() for p in all_params])))
+optimizer = optim.Adam(all_params, lr=args.lr) #, momentum=args.momentum)
 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=5, verbose=True)
 
 def train(epoch):
     model.train()
-    for batch_idx, (data, target) in enumerate(train_loader):
+    for batch_idx, (data, mask, target) in enumerate(train_loader):
         if use_cuda:
-            data, target = data.cuda(), target.cuda()
+            data, mask, target = data.cuda(), mask.cuda(), target.cuda()
         optimizer.zero_grad()
         data = features_model(data)
+        mask = features_model(mask)
+        # stack the two images
+        data = torch.cat((data, mask), 1)
         output = model(data)
         criterion = torch.nn.CrossEntropyLoss(reduction='mean')
         loss = criterion(output, target)
@@ -101,11 +116,14 @@ def validation():
     validation_loss = 0
     correct = 0
     with torch.no_grad():
-        for data, target in val_loader:
+        for data, mask, target in val_loader:
             if use_cuda:
-                data, target = data.cuda(), target.cuda()
-            
+                data, mask, target = data.cuda(), mask.cuda(), target.cuda()
+            optimizer.zero_grad()
             data = features_model(data)
+            mask = features_model(mask)
+            # stack the two images
+            data = torch.cat((data, mask), 1)
             output = model(data)
             # sum up batch loss
             criterion = torch.nn.CrossEntropyLoss(reduction='mean')
@@ -122,15 +140,17 @@ def validation():
     
     return validation_loss, correct/len(val_loader.dataset)
 
-max_validation_accuracy = 0
+criteria = 0
 for epoch in range(1, args.epochs + 1):
     train(epoch)
     validation_loss, accuracy = validation()
 
-    if accuracy > max_validation_accuracy:
-        max_validation_accuracy = accuracy
+    if accuracy > criteria:
+        criteria = accuracy
+    # if validation_loss < criteria:
+    #     criteria = validation_loss
         print('Saving model best scores at epoch {}'.format(epoch))
-        torch.save(model.state_dict(), os.path.join(args.experiment, 'resnet_masked_best_model_221_bis.pth'))
+        torch.save(model.state_dict(), os.path.join(args.experiment, 'resnet_masked_best_model_221_ter.pth'))
 
     # if epoch %  args.save_interval == 0:
     #     model_file = args.experiment + '/model_' + str(epoch) + '.pth'
@@ -139,4 +159,4 @@ for epoch in range(1, args.epochs + 1):
 
     scheduler.step(validation_loss)
 
-print("The best validation accuracy is {}".format(max_validation_accuracy))
+print("The best validation accuracy is {}".format(criteria))
