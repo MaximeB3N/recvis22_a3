@@ -38,7 +38,7 @@ if not os.path.isdir(args.experiment):
     os.makedirs(args.experiment)
 
 # Data initialization and loading
-from data import data_transforms, data_transform_small
+from src.data import data_transforms, data_transform_small
 
 print("Loading data from {}".format(args.data))
 train_loader = torch.utils.data.DataLoader(
@@ -52,7 +52,7 @@ val_loader = torch.utils.data.DataLoader(
 
 # Neural network and optimizer
 # We define neural net in model.py so that it can be reused by the evaluate.py script
-from model import Net, ResNet, ResNetFeatures, NN, NN2, ResNetRetrain
+from src.model import Net, ResNet, ResNetFeatures, NN, NN2, ResNetRetrain
 
 # model = Net()
 # pathFeatures = "experiment/resnet_features_best_model_221_bis.pth"
